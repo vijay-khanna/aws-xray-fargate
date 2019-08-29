@@ -25,11 +25,10 @@ The sample application within the repository consists of two simple microservice
 
 To test out the sample applications on your own ECS/Fargate cluster use the Dockerfiles provided in the GitHub repository, then follow the steps in the README file.
 
-## Prerequisites
+## Detailed Steps
 
-If you do not have an ECS cluster running within your AWS environment, create it now using the following command:
+https://github.com/vijay-khanna/aws-xray-fargate/blob/master/src/README.md
 
-`aws ecs create-cluster --cluster-name <cluster_name> --region us-east-1`
 
 *NOTE:* At present, you can only create Fargate tasks in us-east-1, us-east-2, us-west-2 and eu-west-1.
 
