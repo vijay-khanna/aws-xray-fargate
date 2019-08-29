@@ -1,3 +1,16 @@
+Ask for the Variables as Subnet, Unique Project Name
+
+```
+read -p "Enter a unique Project Name to identify all resources: " Project_Name ; 
+
+echo $Project_Name
+
+cluster_name=${Project_Name}-cluster; echo $cluster_name
+aws ecs create-cluster --cluster-name $cluster_name --region us-east-1
+
+```
+
+
 Create a task role that allows the task to write traces to AWS X-Ray.  Replace *<role_name>* with your role name. 
 
 ```
