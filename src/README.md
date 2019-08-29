@@ -100,6 +100,15 @@ Install ECS CLI
 
 ```
 sudo curl -o /usr/local/bin/ecs-cli https://amazon-ecs-cli.s3.amazonaws.com/ecs-cli-linux-amd64-latest
+gpg --keyserver hkp://keys.gnupg.net --recv BCE9D9A42D51784F
+curl -o ecs-cli.asc https://amazon-ecs-cli.s3.amazonaws.com/ecs-cli-linux-amd64-latest.asc
+
+gpg --verify ecs-cli.asc /usr/local/bin/ecs-cli
+
+sudo chmod +x /usr/local/bin/ecs-cli
+
+ecs-cli --version
+
 
 ```
 
@@ -111,7 +120,9 @@ cd ~/environment/aws-xray-fargate/src/service-b/
 
 docker build -t service-b .
 ecs-cli push service-b
-cd ./service-a/
+
+
+cd ../service-a/
 docker build -t service-a .
 ecs-cli push service-a
 ```
@@ -120,6 +131,7 @@ Set the registry URLs
 
 ```
 export REGISTRY_URL_SERVICE_B=$(aws ecr describe-repositories --repository-name service-b | jq -r '.repositories[].repositoryUri')
+
 export REGISTRY_URL_SERVICE_A=$(aws ecr describe-repositories --repository-name service-a | jq -r '.repositories[].repositoryUri')
 ```
 
@@ -133,27 +145,36 @@ aws logs create-log-group --log-group-name /ecs/service-a
 Create service B.
 
 ```
-cd ./service-b/
+cd ../service-b/
 envsubst < docker-compose.yml-template > docker-compose.yml
 envsubst < ecs-params.yml-template > ecs-params.yml
-ecs-cli compose service up --deployment-max-percent 100 --deployment-min-healthy-percent 0 --target-group-arn $TARGET_GROUP_ARN --launch-type FARGATE --container-name service-b --container-port 8080 --cluster <clustername>
+
+ecs-cli compose service up --deployment-max-percent 100 --deployment-min-healthy-percent 0 --target-group-arn $TARGET_GROUP_ARN_B --launch-type FARGATE --container-name service-b --container-port 8080 --cluster $cluster_name
+
 ```
 
 Create an Application Load Balancer (ALB), listener, and target group for service A.
 
 ```
-export LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer --name <load_balancer_name> --subnets $SUBNET_ID_1 $SUBNET_ID_2 --security-groups $SG_ID --scheme internet-facing --type application | jq -r '.LoadBalancers[].LoadBalancerArn')
-export TARGET_GROUP_ARN=$(aws elbv2 create-target-group --name <target_group_name> --protocol HTTP --port 8080 --vpc-id <vpc_id> --target-type ip --health-check-path /health | jq -r '.TargetGroups[].TargetGroupArn')
-aws elbv2 create-listener --load-balancer-arn $LOAD_BALANCER_ARN --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN
+export load_balancer_name_a=${Project_Name}-lb-a ; echo $load_balancer_name_a
+export target_group_name_a=${Project_Name}-tg-a ; echo $target_group_name_a
+
+export LOAD_BALANCER_ARN_A=$(aws elbv2 create-load-balancer --name $load_balancer_name_a --subnets $SUBNET_ID_1 $SUBNET_ID_2 --security-groups $SG_ID --scheme internet-facing --type application | jq -r '.LoadBalancers[].LoadBalancerArn')
+
+export TARGET_GROUP_ARN_A=$(aws elbv2 create-target-group --name $target_group_name_a --protocol HTTP --port 8080 --vpc-id $vpc_id --target-type ip --health-check-path /health | jq -r '.TargetGroups[].TargetGroupArn')
+
+aws elbv2 create-listener --load-balancer-arn $LOAD_BALANCER_ARN_A --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN_A
 ```
 
 Create service A. 
 
 ```
-cd ./service-a/
+cd ../service-a/
+
 envsubst < docker-compose.yml-template > docker-compose.yml
 envsubst < ecs-params.yml-template > ecs-params.yml
-ecs-cli compose service up --deployment-max-percent 100 --deployment-min-healthy-percent 0 --target-group-arn $TARGET_GROUP_ARN --launch-type FARGATE --container-name service-a --container-port 8080 --cluster <clustername>
+
+ecs-cli compose service up --deployment-max-percent 100 --deployment-min-healthy-percent 0 --target-group-arn $TARGET_GROUP_ARN_A --launch-type FARGATE --container-name service-a --container-port 8080 --cluster $cluster_name
 ```
 
 Open the X-Ray console.
