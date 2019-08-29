@@ -177,4 +177,9 @@ envsubst < ecs-params.yml-template > ecs-params.yml
 ecs-cli compose service up --deployment-max-percent 100 --deployment-min-healthy-percent 0 --target-group-arn $TARGET_GROUP_ARN_A --launch-type FARGATE --container-name service-a --container-port 8080 --cluster $cluster_name
 ```
 
-Open the X-Ray console.
+Simulate Load on LB-A, and Open the X-Ray console.
+```
+ALB_A_DNS=$(aws elbv2 describe-load-balancers --names $load_balancer_name_a |  jq -r '.LoadBalancers[].DNSName') ; echo $ALB_A_DNS
+
+for ((i=1;i<=100;i++)); do   curl $ALB_A_DNS; echo " $i \n"; sleep 5 ; done
+```
