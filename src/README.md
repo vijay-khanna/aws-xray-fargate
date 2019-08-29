@@ -8,14 +8,21 @@ echo $Project_Name
 cluster_name=${Project_Name}-cluster; echo $cluster_name
 aws ecs create-cluster --cluster-name $cluster_name --region us-east-1
 
-```
+cd ~/environment
+git clone https://github.com/vijay-khanna/aws-xray-fargate.git
+cd aws-xray-fargate/src
 
+```
 
 Create a task role that allows the task to write traces to AWS X-Ray.  Replace *<role_name>* with your role name. 
 
 ```
-export TASK_ROLE_NAME=$(aws iam create-role --role-name <role_name> --assume-role-policy-document file://ecs-trust-pol.json | jq -r '.Role.RoleName')
-export XRAY_POLICY_ARN=$(aws iam create-policy --policy-name <policy_name> --policy-document file://xray-pol.json | jq -r '.Policy.Arn')
+export role_name=${Project_Name}-role ; echo $role_name
+export policy_name=${Project_Name}-policy ; echo $policy_name
+
+
+export TASK_ROLE_NAME=$(aws iam create-role --role-name $role_name --assume-role-policy-document file://ecs-trust-pol.json | jq -r '.Role.RoleName')
+export XRAY_POLICY_ARN=$(aws iam create-policy --policy-name $policy_name --policy-document file://xray-pol.json | jq -r '.Policy.Arn')
 aws iam attach-role-policy --role-name $TASK_ROLE_NAME --policy-arn $XRAY_POLICY_ARN
 ```
 
@@ -23,34 +30,43 @@ If this is your first time using ECS you will need to create the ECS Task Execut
 
 ```
 aws iam create-role --role-name ecsTaskExecutionRole --assume-role-policy-document file://ecs-trust-pol.json
+
 export ECS_EXECUTION_POLICY_ARN=$(aws iam list-policies --scope AWS --query 'Policies[?PolicyName==`AmazonECSTaskExecutionRolePolicy`].Arn' | jq -r '.[]')
+
 aws iam attach-role-policy --role-name ecsTaskExecutionRole --policy-arn $ECS_EXECUTION_POLICY_ARN
 ```
 
 Export the Arns of the task role and the task execution role. 
 
 ```
-export TASK_ROLE_ARN=$(aws iam get-role --role-name <role_name> --query "Role.Arn" --output text)
-export TASK_EXECUTION_ROLE_ARN=$(aws iam get-role --role-name ecsTaskExecutionRole --query "Role.Arn" --output text)
-```
+export TASK_ROLE_ARN=$(aws iam get-role --role-name $role_name --query "Role.Arn" --output text) ; echo $TASK_ROLE_ARN
 
-Get a list of subnets in a VPC.  Replace *<vpc_id>* with the vpc id of the vpc where you intend to deploy the services.
+export TASK_EXECUTION_ROLE_ARN=$(aws iam get-role --role-name ecsTaskExecutionRole --query "Role.Arn" --output text) ; echo $TASK_EXECUTION_ROLE_ARN
 
-```
-aws ec2 describe-subnets --query 'Subnets[?VpcId==`<vpc_id>`].SubnetId'
 ```
 
 Choose at least 2 subnets to set as environment variables.  These will be used to populate the ecs-params.yml file.
-
+Enter the VPC ID, and Two Subnets for Containers. 
 ```
-export SUBNET_ID_1=<subnet_id_1>
-export SUBNET_ID_2=<subnet_id_2>
+
+read -p "Enter the VPC ID : " vpc_id ; echo $vpc_id
+
+read -p "Enter the SUBNET_ID_1 : " SUBNET_ID_1 ; echo $SUBNET_ID_1
+
+read -p "Enter the SUBNET_ID_2 ID : " SUBNET_ID_2 ; echo $SUBNET_ID_2
+
+export vpc_id ; 
+export SUBNET_ID_1=$SUBNET_ID_1
+export SUBNET_ID_2=$SUBNET_ID_2
 ```
 
 Create a security group. Replace *<group_name>*, *<description_text>*, and *<vpc_id>* with the appropriate values. The *<vpc_id>* should match the vpc id you used earlier. 
 
 ```
-export SG_ID=$(aws ec2 create-security-group --group-name <group_name> --description <description_text> --vpc-id <vpc_id> | jq -r '.GroupId')
+
+export sec_group_name=${Project_Name}-sec-group ; echo $sec_group_name
+
+export SG_ID=$(aws ec2 create-security-group --group-name $sec_group_name --description sec-grp-for-containers --vpc-id $vpc_id | jq -r '.GroupId')
 ```
 
 Add the following inbound rules to the security group.
@@ -63,21 +79,36 @@ aws ec2 authorize-security-group-ingress --group-id $SG_ID --protocol all --port
 Create an Application Load Balancer (ALB), listener, and target group for service B.
 
 ```
-export LOAD_BALANCER_ARN=$(aws elbv2 create-load-balancer --name <load_balancer_name> --subnets $SUBNET_ID_1 $SUBNET_ID_2 --security-groups $SG_ID --scheme internet-facing --type application | jq -r '.LoadBalancers[].LoadBalancerArn')
-export TARGET_GROUP_ARN=$(aws elbv2 create-target-group --name <target_group_name> --protocol HTTP --port 8080 --vpc-id <vpc_id> --target-type ip --health-check-path /health | jq -r '.TargetGroups[].TargetGroupArn')
-aws elbv2 create-listener --load-balancer-arn $LOAD_BALANCER_ARN --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN
+export load_balancer_name_b=${Project_Name}-lb-b ; echo $load_balancer_name_b
+export target_group_name_b=${Project_Name}-tg-b ; echo $target_group_name_b
+
+export LOAD_BALANCER_ARN_B=$(aws elbv2 create-load-balancer --name $load_balancer_name_b --subnets $SUBNET_ID_1 $SUBNET_ID_2 --security-groups $SG_ID --scheme internet-facing --type application | jq -r '.LoadBalancers[].LoadBalancerArn')
+
+
+export TARGET_GROUP_ARN_B=$(aws elbv2 create-target-group --name $target_group_name_b --protocol HTTP --port 8080 --vpc-id $vpc_id --target-type ip --health-check-path /health | jq -r '.TargetGroups[].TargetGroupArn')
+
+aws elbv2 create-listener --load-balancer-arn $LOAD_BALANCER_ARN_B --protocol HTTP --port 80 --default-actions Type=forward,TargetGroupArn=$TARGET_GROUP_ARN_B
 ```
 
 Get the DNS name of the load balancer. 
 
 ```
-export SERVICE_B_ENDPOINT=$(aws elbv2 describe-load-balancers --load-balancer-arn $LOAD_BALANCER_ARN | jq -r '.LoadBalancers[].DNSName')
+export SERVICE_B_ENDPOINT=$(aws elbv2 describe-load-balancers --load-balancer-arn $LOAD_BALANCER_ARN_B | jq -r '.LoadBalancers[].DNSName') ; echo $SERVICE_B_ENDPOINT
+```
+
+Install ECS CLI
+
+```
+sudo curl -o /usr/local/bin/ecs-cli https://amazon-ecs-cli.s3.amazonaws.com/ecs-cli-linux-amd64-latest
+
 ```
 
 Build and push the containers to ECR.
 
 ```
-cd ./service-b/
+cd ~/environment/aws-xray-fargate/src/service-b/
+
+
 docker build -t service-b .
 ecs-cli push service-b
 cd ./service-a/
