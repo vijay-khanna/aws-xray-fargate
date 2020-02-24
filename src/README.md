@@ -1,3 +1,6 @@
+
+Ensure the Cloud9-> Preferences-AWS Settings -> 'AWS Managed Security Credentials' are switched off. and the Cloud9 Instance has Admin role assigned. 
+
 Ask for the Variables as Subnet, Unique Project Name
 
 ```
@@ -7,6 +10,8 @@ echo $Project_Name
 
 cluster_name=${Project_Name}-cluster; echo $cluster_name
 aws ecs create-cluster --cluster-name $cluster_name --region us-east-1
+
+sudo yum -y install jq gettext
 
 cd ~/environment
 git clone https://github.com/vijay-khanna/aws-xray-fargate.git
@@ -47,6 +52,9 @@ export TASK_EXECUTION_ROLE_ARN=$(aws iam get-role --role-name ecsTaskExecutionRo
 
 Choose at least 2 subnets to set as environment variables.  These will be used to populate the ecs-params.yml file.
 Enter the VPC ID, and Two Subnets for Containers. 
+
+Ensure there is no whte space / Enter symbol in the copy-paste of VPC/Subnets. 
+
 ```
 
 read -p "Enter the VPC ID : " vpc_id ; echo $vpc_id
