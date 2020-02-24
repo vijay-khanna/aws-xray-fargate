@@ -17,6 +17,9 @@ cd ~/environment
 git clone https://github.com/vijay-khanna/aws-xray-fargate.git
 cd aws-xray-fargate/src
 
+## Run aws configure, just specify the region
+aws configure
+
 ```
 
 Create a task role that allows the task to write traces to AWS X-Ray.  Replace *<role_name>* with your role name. 
