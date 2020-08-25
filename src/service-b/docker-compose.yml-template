@@ -1,7 +1,7 @@
 version: '2'
 services:
   service-b:
-    image: ${REGISTRY_URL_SERVICE_B}
+    image: ${XRay_REGISTRY_URL_SERVICE_B}
     ports:
     - 8080:8080
     environment:
